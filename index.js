@@ -21,8 +21,15 @@ const margin = {
 
 const size = {
     width: 900,
-    height: 500
+    height: 600
 }
+
+const textWrap = (text) => {
+    x = text.split(" ");
+    result = x.join(" <br> ")
+    return result
+}
+
 
 //create svg
 
@@ -42,8 +49,8 @@ const callChart = async(url, type) => {
     const description = d3.select(".currentDescription").text(`${type}`)
 
     //Create chart
-    const rootTree = d3.hierarchy(data).sum((e) => e.value)
-    const tree = d3.treemap().size([size.width, size.height]).padding(1);
+    const rootTree = d3.hierarchy(data).sum((e) => e.value).sort((a, b) => b.value - a.value);
+    const tree = d3.treemap().size([size.width, size.height - margin.bottom]).padding(1);
     tree(rootTree);
 
     const colorScale = d3.scaleSequential().domain([1, rootTree.data.children.length]).interpolator(d3.interpolateRainbow);
@@ -51,10 +58,12 @@ const callChart = async(url, type) => {
         rootTree.data.children[i].color = colorScale(i);
     }
 
-    const chartTree = svg.append("g");
-    chartTree.selectAll(".tile")
+    const chartTree = svg.append("g")
+        .selectAll(".tile")
         .data(rootTree.leaves())
         .enter()
+        .append('g')
+    chartTree
         .append("rect")
         .attr("x", d => d.x0)
         .attr("y", d => d.y0)
@@ -65,10 +74,66 @@ const callChart = async(url, type) => {
         .attr("data-category", d => d.data.category)
         .attr("data-value", d => d.data.value)
         .attr("fill", d => d.parent.data.color)
-        .text(d => d.data.name)
+
+    .style("font-size", "10px")
+    chartTree.append("text")
+        .html(d => textWrap(d.data.name))
+        .attr("x", d => d.x0 + 5)
+        .attr("y", d => d.y0 + 10)
         .style("font-size", "10px")
 
-    //Create legend
+    /*-------------------------------Legend-------------------------------*/
+
+    //create an array with all category name
+    const category = d3.hierarchy(data).data.children.map(e => e);
+    const categoryArr = category.map(e => e.name);
+
+    const xScale = d3.scaleBand().domain(categoryArr).range([margin.left, size.width - margin.right])
+
+    const legend = svg.append("g").attr("id", "legend");
+
+    const legendGroup = legend.selectAll(".legend__g")
+        .data(categoryArr)
+        .enter()
+        .append("g")
+
+    legendGroup.append("rect")
+        .attr("width", xScale.bandwidth())
+        .attr("height", 20)
+        .attr("y", (d, i) => {
+
+            if (i <= categoryArr.length) {
+                return size.height - (margin.bottom / 2);
+            } else {
+                return (size.height - (margin.bottom / 2)) + 20;
+            }
+
+
+        })
+        .attr("x", (d, i) => {
+            return xScale(d)
+        })
+        .attr("fill", "blue")
+
+    xNumber = 0;
+    yNumber = 4;
+
+    legendGroup.append("text")
+        .attr("x", (d, i) => {
+            return xScale(d)
+        })
+        .attr("y", (d, i) => {
+            if (i <= categoryArr.length) {
+                return size.height - (margin.bottom / 2);
+            } else {
+                return (size.height - (margin.bottom / 2)) + 20;
+            }
+        })
+        .text(d => d)
+        .attr("text-anchor", "start")
+        .style("font-size", "10px")
+
+
 
     //Create tooltip
 
@@ -76,4 +141,4 @@ const callChart = async(url, type) => {
 
 }
 
-callChart(chartUrl.kickStarter, description.movie);
+callChart(chartUrl.kickStarter, description.game);
