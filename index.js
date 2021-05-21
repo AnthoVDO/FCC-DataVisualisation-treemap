@@ -50,13 +50,16 @@ const callChart = async(url, type) => {
 
     //Create chart
     const rootTree = d3.hierarchy(data).sum((e) => e.value).sort((a, b) => b.value - a.value);
-    const tree = d3.treemap().size([size.width, size.height - margin.bottom]).padding(1);
-    tree(rootTree);
+
 
     const colorScale = d3.scaleSequential().domain([1, rootTree.data.children.length]).interpolator(d3.interpolateRainbow);
     for (let i = 0; i < rootTree.data.children.length; i++) {
         rootTree.data.children[i].color = colorScale(i);
     }
+
+    const tree = d3.treemap().size([size.width, size.height - margin.bottom]).padding(1);
+    tree(rootTree);
+
 
     const chartTree = svg.append("g")
         .selectAll(".tile")
@@ -73,22 +76,29 @@ const callChart = async(url, type) => {
         .attr("data-name", d => d.data.name)
         .attr("data-category", d => d.data.category)
         .attr("data-value", d => d.data.value)
+        .attr("data-color", d => d.parent.data.color)
         .attr("fill", d => d.parent.data.color)
-
-    .style("font-size", "10px")
+        .style("font-size", "10px")
     chartTree.append("text")
-        .html(d => textWrap(d.data.name))
+        .text(d => d.data.name)
+        .attr("data-name", d => d.data.name)
+        .attr("data-category", d => d.data.category)
+        .attr("data-value", d => d.data.value)
+        .attr("data-color", d => d.parent.data.color)
         .attr("x", d => d.x0 + 5)
         .attr("y", d => d.y0 + 10)
         .style("font-size", "10px")
+
 
     /*-------------------------------Legend-------------------------------*/
 
     //create an array with all category name
     const category = d3.hierarchy(data).data.children.map(e => e);
-    const categoryArr = category.map(e => e.name);
+    const categoryArr = tree(rootTree).children.map(e => {
+        return { color: e.data.color, name: e.data.name, size: 1 };
+    })
 
-    const xScale = d3.scaleBand().domain(categoryArr).range([margin.left, size.width - margin.right])
+    const xScale = d3.scaleBand().domain(categoryArr.map(e => e.size)).range([margin.left, size.width - margin.right]).padding(0.1)
 
     const legend = svg.append("g").attr("id", "legend");
 
@@ -100,44 +110,52 @@ const callChart = async(url, type) => {
     legendGroup.append("rect")
         .attr("width", xScale.bandwidth())
         .attr("height", 20)
-        .attr("y", (d, i) => {
-
-            if (i <= categoryArr.length) {
-                return size.height - (margin.bottom / 2);
-            } else {
-                return (size.height - (margin.bottom / 2)) + 20;
-            }
-
-
-        })
+        .attr("y", size.height - (margin.bottom / 2))
         .attr("x", (d, i) => {
-            return xScale(d)
+            return xScale(d.size)
         })
-        .attr("fill", "blue")
+        .attr("fill", (d, i) => d.color)
+
+    //console.log("color: " + colorScale(i - 1) + "cat: " + d
 
     xNumber = 0;
     yNumber = 4;
 
     legendGroup.append("text")
-        .attr("x", (d, i) => {
-            return xScale(d)
-        })
-        .attr("y", (d, i) => {
-            if (i <= categoryArr.length) {
-                return size.height - (margin.bottom / 2);
-            } else {
-                return (size.height - (margin.bottom / 2)) + 20;
-            }
-        })
-        .text(d => d)
-        .attr("text-anchor", "start")
+        .attr("x", d => xScale(d.size) + xScale.bandwidth() / 2)
+        .attr("y", (size.height - (margin.bottom / 2)) + 13)
+        .text(d => d.name)
         .style("font-size", "10px")
+        .attr("text-anchor", "middle")
+        .style("fill", "white")
 
 
 
     //Create tooltip
 
+    const tooltip = d3.select(".chart__container").append("div");
+
+    tooltip.attr("id", "tooltip")
+        .style("opacity", "0")
+        .style("position", "absolute")
+        .style("background-color", "gold")
+        .style("padding", "10px")
+        .style("border-radius", "5px")
+
     //Create hover effect
+
+    chartTree.on("mousemove", (e) => {
+        const element = e.target.dataset;
+        let tooltipWidth = parseInt(tooltip.style("width"), 10) / 2;
+        tooltip.style("opacity", "1")
+            .html(`Name: ${element.name}<br> Category: ${element.category}<br> Value:${element.value} <br> Color: ${element.color}`)
+            .style("left", e.offsetX - tooltipWidth + "px")
+            .style("top", e.offsetY + 30 + "px")
+    })
+
+    chartTree.on("mouseout", (e) => {
+        tooltip.style("opacity", "0")
+    })
 
 }
 
